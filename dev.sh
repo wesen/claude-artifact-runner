@@ -18,7 +18,7 @@ fi
 # Check if air is installed (for Go hot reloading)
 if ! command -v air &> /dev/null; then
     echo "Installing air for Go hot reloading..."
-    go install github.com/cosmtrek/air@latest
+    go install github.com/air-verse/air@latest
 fi
 
 # Create air configuration file if it doesn't exist

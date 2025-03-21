@@ -201,6 +201,16 @@ The default app is composed of two demo components: a login form and a signup fo
 
 If you just want to run a single Artifact, you can follow these simple steps:
 
+### Method 1: Using the Paste Feature
+
+1. Follow the "Getting started" steps.
+2. Navigate to http://localhost:5173/home (or http://localhost:3000/home if using the Go server)
+3. Click on the "Paste New Artifact" button
+4. Enter a name for your artifact and paste the HTML code from Claude
+5. Click "Save Artifact" and your artifact will be saved and available in the dashboard
+
+### Method 2: Manual File Creation
+
 1. Follow the "Getting started" steps. Leave the browser open at the initial page.
 2. Delete the files in the `src/artifacts/` directory.
 3. Download your Artifact from Claude.ai
@@ -214,14 +224,17 @@ Note that you'll be viewing the app in development mode. To generate the final a
 If you want to create a multi-page application, you can follow these steps:
 
 1. Follow the previous section's steps.
-2. Generate more Artifacts using Claude and download them to the `src/artifacts/` directory.
-5. Give each file it a unique name, such as `your-component.tsx`. Each component you add will be a new page accessible at `http://localhost:5173/your-component-name` (without the `.tsx` extension).
-6. If you have `npm run dev` running in the background, the new pages will be ready to display immediately. If a page is already open when being updated, it will refresh automatically.
-7. You can link Artifacts to each other to build a multi-page application.
+2. Generate more Artifacts using Claude and add them to your application using either method:
+   - Use the Paste feature to add new artifacts directly via the web interface
+   - Download them to the `src/artifacts/` directory manually
+3. Each artifact you add will be a new page accessible at `http://localhost:5173/your-component-name` (without the `.tsx` extension).
+4. Use the dashboard at `/home` to view and navigate between all your artifacts.
+5. If you have `npm run dev` running in the background, the new pages will be ready to display immediately. If a page is already open when being updated, it will refresh automatically.
+6. You can link Artifacts to each other to build a multi-page application.
    > **It's easy:** on each Artifact page, just add links that navigate to the other Artifacts, by specifying their names without the `.tsx` extension.  
    E.g. `<a href="my-component">Go to My Component</a>`
-8. You can also use the `useNavigate` hook to navigate to a specific page.
-9. Finally, to create a release build and publish your finished application, follow the instructions further below.
+7. You can also use the `useNavigate` hook to navigate to a specific page.
+8. Finally, to create a release build and publish your finished application, follow the instructions further below.
 
 ## Developing a more complex application
 

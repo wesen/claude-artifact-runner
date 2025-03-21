@@ -1,0 +1,14 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+bin = "./tmp/main -dev"
+cmd = "go build -o ./tmp/main ."
+delay = 1000
+exclude_dir = ["node_modules", "dist", "tmp"]
+include_ext = ["go", "html"]
+exclude_regex = ["_test\\.go"]
+
+[screen]
+clear_on_rebuild = true
+keep_scroll = true

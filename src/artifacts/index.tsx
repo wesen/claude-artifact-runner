@@ -105,6 +105,10 @@ const LoginForm = () => {
             <Link to="signup" className="text-primary hover:underline font-bold">
               Sign up
             </Link>
+            {' | '}
+            <Link to="home" className="text-primary hover:underline font-bold">
+              View All Artifacts
+            </Link>
           </div>
         </CardContent>
       </Card>

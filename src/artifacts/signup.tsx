@@ -122,6 +122,10 @@ const SignupForm = () => {
             <Link to="/" className="text-primary hover:underline font-bold">
               Log in
             </Link>
+            {' | '}
+            <Link to="home" className="text-primary hover:underline font-bold">
+              View All Artifacts
+            </Link>
           </div>
         </CardContent>
       </Card>
