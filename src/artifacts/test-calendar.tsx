@@ -1,17 +1,4 @@
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Link } from "react-router-dom";
-
-const TestcalendarArtifact = () => {
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <Card className="w-full max-w-4xl">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center">Test Calendar</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="artifact-container">
-            import React, { useState } from 'react';
+import { useState, ChangeEvent } from 'react';
 
 const CalendarMeetingCreator = () => {
   const [meetingData, setMeetingData] = useState({
@@ -24,7 +11,7 @@ const CalendarMeetingCreator = () => {
     endTime: '10:00',
   });
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setMeetingData({
       ...meetingData,
@@ -34,7 +21,7 @@ const CalendarMeetingCreator = () => {
 
   const generateICS = () => {
     // Format dates for ICS
-    const formatDate = (date, time) => {
+    const formatDate = (date: string, time: string): string => {
       const dateObj = new Date(`${date}T${time}`);
       return dateObj.toISOString().replace(/-|:|\.\d{3}/g, '');
     };
@@ -99,7 +86,7 @@ const CalendarMeetingCreator = () => {
             value={meetingData.description}
             onChange={handleInputChange}
             className="mt-1 p-2 w-full border rounded-md"
-            rows="2"
+            rows={2}
           />
         </div>
         
@@ -174,17 +161,3 @@ const CalendarMeetingCreator = () => {
 };
 
 export default CalendarMeetingCreator;
-          </div>
-          
-          <div className="text-center text-sm mt-6">
-            <Link to="/home" className="text-primary hover:underline font-bold">
-              Back to Artifacts
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-export default TestcalendarArtifact;

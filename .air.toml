@@ -2,7 +2,7 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-bin = "./tmp/main -dev"
+bin = "./tmp/main -dev -debug"
 cmd = "go build -o ./tmp/main ."
 delay = 1000
 exclude_dir = ["node_modules", "dist", "tmp"]

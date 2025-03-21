@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 artifact-runner
+
+.history
+.specstory

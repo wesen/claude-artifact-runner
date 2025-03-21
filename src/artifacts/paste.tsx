@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AlertCircle, Code, Eye, Save } from 'lucide-react';
+import { AlertCircle, Code, Eye, Save, RefreshCcw, Home, ArrowRight } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,15 +7,18 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const ArtifactPaste = () => {
+  const navigate = useNavigate();
   const [artifactCode, setArtifactCode] = useState('');
   const [artifactName, setArtifactName] = useState('');
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
   const [activeTab, setActiveTab] = useState('paste');
+  const [savedArtifact, setSavedArtifact] = useState<{id: string, path: string} | null>(null);
+  const [refreshNeeded, setRefreshNeeded] = useState(false);
 
   useEffect(() => {
     // When switching to the preview tab, generate the preview
@@ -86,7 +89,18 @@ const ArtifactPaste = () => {
         throw new Error(`Server responded with ${response.status}`);
       }
 
-      await response.json();
+      const result = await response.json();
+
+      // Store the saved artifact info
+      setSavedArtifact({
+        id: result.id,
+        path: result.path
+      });
+      
+      // Set refresh needed flag based on dev mode
+      if (result.devMode) {
+        setRefreshNeeded(true);
+      }
 
       // Clear the form and show success message
       setArtifactCode('');
@@ -94,10 +108,7 @@ const ArtifactPaste = () => {
       setError('');
       setSuccessMessage(`Artifact "${artifactName}" saved successfully!`);
 
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccessMessage('');
-      }, 3000);
+      // Don't auto-clear success message since we'll show navigation options
 
     } catch (err) {
       console.error('Error saving artifact:', err);
@@ -180,17 +191,59 @@ const ArtifactPaste = () => {
             </Alert>
           )}
 
-          {successMessage && (
-            <Alert variant="default" className="mt-4 bg-green-50 border-green-200">
-              <AlertDescription className="text-green-600">{successMessage}</AlertDescription>
-            </Alert>
+          {successMessage && savedArtifact && (
+            <div className="mt-6 space-y-4">
+              <Alert variant="default" className="bg-green-50 border-green-200">
+                <AlertDescription className="text-green-600">{successMessage}</AlertDescription>
+              </Alert>
+
+              <div className="bg-blue-50 border border-blue-100 rounded-md p-4">
+                <h3 className="font-medium text-blue-800 mb-2">Next Steps:</h3>
+                <p className="text-blue-700 mb-4">
+                  Your artifact has been saved. {refreshNeeded && "In development mode, routes may need to be refreshed to be accessible."}
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button 
+                    variant="default" 
+                    onClick={() => navigate('/home')}
+                    className="flex-1 gap-2"
+                  >
+                    <Home className="h-4 w-4" />
+                    Go to Home
+                  </Button>
+                  
+                  {refreshNeeded ? (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => window.location.reload()}
+                      className="flex-1 gap-2"
+                    >
+                      <RefreshCcw className="h-4 w-4" />
+                      Refresh Routes
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => navigate(savedArtifact.path)}
+                      className="flex-1 gap-2"
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                      View Artifact
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
 
-          <div className="text-center text-sm mt-6">
-            <Link to="/" className="text-primary hover:underline font-bold">
-              Back to Artifacts
-            </Link>
-          </div>
+          {!successMessage && (
+            <div className="text-center text-sm mt-6">
+              <Link to="/home" className="text-primary hover:underline font-bold">
+                Back to Artifacts
+              </Link>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -15,6 +15,9 @@ if ! command -v node &> /dev/null; then
     exit 1
 fi
 
+# Install zerolog if not already installed
+go get -u github.com/rs/zerolog
+
 # Check if air is installed (for Go hot reloading)
 if ! command -v air &> /dev/null; then
     echo "Installing air for Go hot reloading..."
@@ -28,7 +31,7 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-bin = "./tmp/main -dev"
+bin = "./tmp/main -dev -debug"
 cmd = "go build -o ./tmp/main ."
 delay = 1000
 exclude_dir = ["node_modules", "dist", "tmp"]
@@ -40,6 +43,10 @@ clear_on_rebuild = true
 keep_scroll = true
 EOL
     echo "Created .air.toml configuration file"
+else
+    # Update existing air.toml to include debug flag
+    sed -i 's/bin = "\.\/tmp\/main -dev"/bin = "\.\/tmp\/main -dev -debug"/g' .air.toml
+    echo "Updated .air.toml to enable debug logging"
 fi
 
 # Start vite in background
@@ -58,7 +65,7 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Start air (Go hot reloader)
-echo "Starting Go server with hot reloading..."
+echo "Starting Go server with hot reloading and debug logging..."
 air
 
 # This will not run unless air exits
