@@ -1,6 +1,6 @@
 # Claude Artifact Runner
 
-A template project for easily converting Claude AI’s Artifacts into React applications, ready to run out of the box or extend as needed.
+A template project for easily converting Claude AI's Artifacts into React applications, ready to run out of the box or extend as needed.
 
 ## TL/DR
 
@@ -31,6 +31,7 @@ A template project for easily converting Claude AI’s Artifacts into React appl
 - [Running a single Artifact](#running-a-single-artifact)
 - [Creating a multi-page application](#creating-a-multi-page-application)
 - [Developing a more complex application](#developing-a-more-complex-application)
+- [Go Server Integration](#go-server-integration)
 - [Project structure](#project-structure)
 - [Building for production](#building-for-production)
 - [Deploying your application](#deploying-your-application)
@@ -84,11 +85,58 @@ Built with modern web development essentials including TypeScript, Tailwind CSS,
 
 You'll be able to deploy your app anywhere, whether locally for your own use, in a company intranet or in a public-facing production environment, at the webhosting or cloud provider of your choice.
 
+## Go Server Integration
+
+This project now includes a Go server that embeds the compiled React application, allowing you to distribute it as a single binary. 
+
+### Prerequisites for Go Server
+
+- Go 1.18 or later
+- Air (optional, for hot reloading)
+
+### Development Mode
+
+To run the application in development mode with hot reloading:
+
+```bash
+./dev.sh
+```
+
+This will:
+1. Start Vite in watch mode for frontend development
+2. Run the Go server with Air for hot reloading
+3. Serve the application at http://localhost:3000
+
+### Production Build
+
+To build a production version with the frontend embedded in the Go binary:
+
+```bash
+./build.sh
+```
+
+This will:
+1. Build the React application
+2. Compile the Go server with the frontend embedded
+3. Generate a single binary named `artifact-runner`
+
+### Running the Production Build
+
+```bash
+./artifact-runner
+```
+
+By default, the server will run on port 3000. You can change this with the `-port` flag:
+
+```bash
+./artifact-runner -port 8080
+```
+
 ## Limitations
 
 This project is meant for running Artifacts that are interactive web apps, usually made in React, and for which Claude writes Javascript or Typescript code.
 
-**Mermaid diagrams, SVGs, and other document-type Artifacts are out of the project’s scope.**
+**Mermaid diagrams, SVGs, and other document-type Artifacts are out of the project's scope.**
 
 Also, Claude's Artifacts run client-side only (i.e. in the browser). As such, they are limited in their capabilities.
 
@@ -117,6 +165,7 @@ Before you begin, ensure you have the following installed:
 - Node.js
   minimum supported version is 16 (lts/gallium), tested up to version 23.2, version 22.11 is recommended
 - npm (usually comes with Node.js)
+- Go 1.18+ (for the Go server integration)
 
 ## Getting started
 
@@ -135,8 +184,13 @@ Before you begin, ensure you have the following installed:
    ```
    npm run dev
    ```
+   
+   Or with Go server + hot reloading:
+   ```
+   ./dev.sh
+   ```
 
-4. Open your browser and visit `http://localhost:5173` to see the default app running.
+4. Open your browser and visit `http://localhost:5173` (Vite) or `http://localhost:3000` (Go server) to see the default app running.
 
 The default app is composed of two demo components: a login form and a signup form. You can navigate between them by clicking on the link at the bottom of the form.
 
@@ -216,6 +270,10 @@ To do that, you may remove the pre-installed components or libraries that are no
 | `src/index.css`                            | Tailwind styles                                       |
 | `src/main.tsx`                             | Entry point of the application                        |
 | `src/vite-env.d.ts`                        | Type definitions for Vite                             |
+| `server.go`                                | Go server for embedding and serving the application   |
+| `dev.sh`                                   | Development script for hot reloading                  |
+| `build.sh`                                 | Build script for production                           |
+| `.air.toml`                                | Configuration for Air (Go hot reloading)              |
 | `.eslintrc.cjs`                            | ESLint configuration                                  |
 | `components.json`                          | Shadcn UI components configuration                    |
 | `index.html`                               | Entry HTML file                                       |
@@ -236,9 +294,19 @@ npm run build
 
 This will generate optimized files in the `dist/` directory, ready for deployment.
 
+To build a production version with the frontend embedded in the Go binary:
+
+```
+./build.sh
+```
+
+This will generate a single binary named `artifact-runner` that contains both the Go server and the embedded frontend.
+
 ## Deploying your application
 
 After running `npm run build`, you'll have a `dist` folder containing the built files (typically an HTML file, a JavaScript file, and a CSS file).
+
+Alternatively, after running `./build.sh`, you'll have a single binary named `artifact-runner` that can be deployed directly.
 
 Here are several ways to deploy these files:
 
@@ -258,11 +326,23 @@ For local testing of the production build, you can use the `serve` package:
 
 3. Open a browser and go to `http://localhost:3000` (or the URL provided in the terminal).
 
+Or if you're using the Go server:
+
+```
+./artifact-runner
+```
+
 ### Traditional web hosting
 
 If you want to deploy to a shared or dedicated web server:
 
 1. Upload the contents of the `dist` folder to your web server's public HTML directory (often called `public_html`, `www`, or `htdocs`).
+
+Alternatively, if using the Go server:
+
+1. Upload the `artifact-runner` binary to your server.
+2. Make it executable: `chmod +x artifact-runner`
+3. Run it directly or set it up with systemd or another process manager.
 
 Remember to update any necessary configuration files (like `vite.config.ts`) before building your app if it is not being served from the root of your domain.
 
