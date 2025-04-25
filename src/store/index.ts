@@ -1,7 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit';
-import transcriptReducer from './transcriptSlice';
-import topicsReducer from './topicsSlice';
-import uiReducer from './uiSlice';
+import transcriptReducer from './transcriptSlice.ts';
+import topicsReducer from './topicsSlice.ts';
+import uiReducer from './uiSlice.ts';
 
 export const store = configureStore({
   reducer: {

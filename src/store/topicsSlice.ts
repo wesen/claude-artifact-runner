@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { Topic, TimeRange, parseTimestamp } from '../utils/transcriptUtils';
+import { Topic, TimeRange, parseTimestamp } from '../utils/transcriptUtils.ts';
 
-interface TopicsState {
+export interface TopicsState {
   specificTopics: Topic[];
   generalTopics: Topic[];
   selectedTopic: Topic | null;

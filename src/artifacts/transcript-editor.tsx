@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useState } from 'react';
 // Import the prompt text as a raw string
 import promptText from '../../tests/transcript-editor/prompt.txt?raw';
 // Import utilities
@@ -29,7 +29,8 @@ import {
 } from '../store/topicsSlice';
 import { 
   toggleDebugInfo, 
-  copyWithFeedback 
+  copyWithFeedback,
+  setPromptModal
 } from '../store/uiSlice';
 import {
   selectParsedTranscript,
@@ -42,8 +43,9 @@ import {
   selectPromptCopied,
   selectTopicInfoCopied,
   selectTranscriptViewCopied,
-  selectBlogPromptCopied,
-  selectSubtopicsPromptCopied
+  selectShowPromptModal,
+  selectPromptModalContent,
+  selectPromptModalTitle
 } from '../store/selectors';
 
 // Controls console logging
@@ -54,6 +56,82 @@ const debugLog = (...args: unknown[]) => {
   if (isDebug) {
     console.log(...args);
   }
+};
+
+// PromptModal Component
+const PromptModal = () => {
+  const dispatch = useAppDispatch();
+  const showModal = useAppSelector(selectShowPromptModal);
+  const modalContent = useAppSelector(selectPromptModalContent);
+  const modalTitle = useAppSelector(selectPromptModalTitle);
+  const [copied, setCopied] = useState(false);
+
+  if (!showModal) return null;
+
+  const handleCopy = () => {
+    if (!modalContent) return;
+    
+    navigator.clipboard.writeText(modalContent)
+      .then(() => {
+        setCopied(true);
+        // Reset after 2 seconds
+        setTimeout(() => {
+          setCopied(false);
+        }, 2000);
+      })
+      .catch((err) => {
+        console.error('Failed to copy: ', err);
+        alert('Failed to copy text.');
+      });
+  };
+
+  const handleClose = () => {
+    dispatch(setPromptModal({ show: false }));
+    setCopied(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg w-3/4 max-w-4xl max-h-[80vh] flex flex-col shadow-xl">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h3 className="text-lg font-semibold">{modalTitle}</h3>
+          <div className="flex items-center space-x-2">
+            <button 
+              className={`p-2 rounded ${copied ? 'bg-green-100 text-green-700' : 'bg-gray-100 hover:bg-gray-200'}`}
+              onClick={handleCopy}
+            >
+              {copied ? (
+                <span className="flex items-center">
+                  <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Copied!
+                </span>
+              ) : (
+                <span className="flex items-center">
+                  <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                  </svg>
+                  Copy
+                </span>
+              )}
+            </button>
+            <button 
+              className="p-2 rounded bg-gray-100 hover:bg-gray-200"
+              onClick={handleClose}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div className="p-4 overflow-y-auto flex-1">
+          <pre className="whitespace-pre-wrap bg-gray-50 p-4 rounded border text-sm">{modalContent}</pre>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const TranscriptAnalyzer = () => {
@@ -68,8 +146,6 @@ const TranscriptAnalyzer = () => {
   const promptCopied = useAppSelector(selectPromptCopied);
   const topicInfoCopied = useAppSelector(selectTopicInfoCopied);
   const transcriptViewCopied = useAppSelector(selectTranscriptViewCopied);
-  const blogPromptCopied = useAppSelector(selectBlogPromptCopied);
-  const subtopicsPromptCopied = useAppSelector(selectSubtopicsPromptCopied);
   
   const dispatch = useAppDispatch();
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -202,17 +278,25 @@ const TranscriptAnalyzer = () => {
   };
 
   // Handlers for prompt application and copy
-  const handleCopyBlogArticlePrompt = () => {
+  const handleShowBlogArticlePrompt = () => {
     const filledPrompt = applyPromptTemplate(blogArticlePrompt);
     if (filledPrompt) {
-      dispatch(copyWithFeedback(filledPrompt, 'blogPromptCopied'));
+      dispatch(setPromptModal({ 
+        show: true, 
+        content: filledPrompt, 
+        title: `Blog Article Prompt for "${selectedTopic?.name}"` 
+      }));
     }
   };
 
-  const handleCopySubtopicsPrompt = () => {
+  const handleShowSubtopicsPrompt = () => {
     const filledPrompt = applyPromptTemplate(subtopicsTweetsPrompt);
     if (filledPrompt) {
-      dispatch(copyWithFeedback(filledPrompt, 'subtopicsPromptCopied'));
+      dispatch(setPromptModal({ 
+        show: true, 
+        content: filledPrompt, 
+        title: `Subtopics & Tweets Prompt for "${selectedTopic?.name}"` 
+      }));
     }
   };
 
@@ -267,23 +351,23 @@ const TranscriptAnalyzer = () => {
         <h3 className="text-md font-bold mb-2">Prompt Tools</h3>
         <div className="flex space-x-2">
           <button
-            className={`px-3 py-2 rounded text-sm ${blogPromptCopied ? 'bg-green-300' : 'bg-green-100 hover:bg-green-200'}`}
-            onClick={handleCopyBlogArticlePrompt}
-            disabled={blogPromptCopied || !selectedTopic}
+            className="px-3 py-2 rounded text-sm bg-green-100 hover:bg-green-200"
+            onClick={handleShowBlogArticlePrompt}
+            disabled={!selectedTopic}
           >
-            {blogPromptCopied ? 'Blog Prompt Copied!' : 'Create Blog Article Prompt'}
+            Create Blog Article Prompt
           </button>
           
           <button
-            className={`px-3 py-2 rounded text-sm ${subtopicsPromptCopied ? 'bg-purple-300' : 'bg-purple-100 hover:bg-purple-200'}`}
-            onClick={handleCopySubtopicsPrompt}
-            disabled={subtopicsPromptCopied || !selectedTopic}
+            className="px-3 py-2 rounded text-sm bg-purple-100 hover:bg-purple-200"
+            onClick={handleShowSubtopicsPrompt}
+            disabled={!selectedTopic}
           >
-            {subtopicsPromptCopied ? 'Subtopics Prompt Copied!' : 'Create Subtopics & Tweets Prompt'}
+            Create Subtopics & Tweets Prompt
           </button>
         </div>
         <div className="mt-2 text-xs text-gray-500">
-          {!selectedTopic ? 'Select a topic to enable prompt tools' : 'Click a button to fill the template with current data and copy to clipboard'}
+          {!selectedTopic ? 'Select a topic to enable prompt tools' : 'Click a button to view the prompt with current data'}
         </div>
       </div>
     );
@@ -291,6 +375,9 @@ const TranscriptAnalyzer = () => {
 
   return (
     <div className="flex h-screen bg-gray-100">
+      {/* Prompt Modal */}
+      <PromptModal />
+      
       {/* Left Sidebar - Topics */}
       <div className="w-64 bg-white p-4 overflow-y-auto border-r">
         <h2 className="text-xl font-bold mb-4">Topics</h2>
@@ -421,28 +508,73 @@ const TranscriptAnalyzer = () => {
                   return (
                     <div 
                       key={`group-${index}`} 
-                      className="mb-3 p-2 rounded highlight bg-yellow-100" // Always highlighted when grouped
+                      // Add data attributes for the group's time range
+                      data-starttime={group.firstSegment.startTime}
+                      data-endtime={group.lastSegment.endTime}
+                      // Add extra margin-top if this group is not the first one, 
+                      // indicating a discontinuity from the previous block.
+                      className={`p-2 rounded highlight bg-yellow-100 ${index > 0 ? 'mt-6' : 'mt-3'} mb-3`} 
                     >
                       <div className="font-mono text-xs text-gray-500 mb-1">
                         {formatTime(group.firstSegment.startTime)}-{formatTime(group.lastSegment.endTime)}
                       </div>
-                      {/* Render segments with timestamps for gaps greater than 2 minutes */}
+                      {/* Render segments with timestamps based on gaps or intervals */}
                       <div style={{ whiteSpace: 'pre-line' }}>
-                        {group.segments.reduce((acc, segment, i) => {
-                          if (i > 0) {
-                            const previousSegment = group.segments[i - 1];
-                            if (isSignificantTimeGap(segment, previousSegment)) {
-                              // Add a timestamp if there's a significant gap
-                              acc.push(
-                                <div key={`timestamp-${i}`} className="text-xs font-semibold text-gray-600 mt-2 mb-1">
-                                  [{formatTime(segment.startTime)}]
-                                </div>
-                              );
+                        {(() => {
+                          let lastMarkerTime = group.firstSegment.startTime;
+                          const elements: React.ReactNode[] = [];
+                          let isFirstSegmentInLoop = true; // To handle edge case at the start
+
+                          group.segments.forEach((segment, i) => {
+                            let separatorInserted = false;
+
+                            if (i > 0) {
+                              const previousSegment = group.segments[i - 1];
+                              // Priority 1: Check for significant gaps
+                              if (isSignificantTimeGap(segment, previousSegment)) {
+                                elements.push(
+                                  <div 
+                                    key={`gap-separator-${i}`} 
+                                    // Style for significant gap marker (no border)
+                                    className="text-sm font-bold text-orange-700 mt-4 mb-2 pt-2"
+                                  >
+                                    [{formatTime(segment.startTime)}] - Gap
+                                  </div>
+                                );
+                                lastMarkerTime = segment.startTime;
+                                separatorInserted = true;
+                              }
                             }
-                          }
-                          acc.push(<div key={`segment-text-${i}`}>{segment.text}</div>);
-                          return acc;
-                        }, [] as React.ReactNode[])}
+
+                            // Priority 2: Check for 2-minute interval if no gap was inserted
+                            if (!separatorInserted && (segment.startTime - lastMarkerTime >= 120)) {
+                              // Avoid inserting at the very start if the first segment itself triggers it
+                              // or immediately after a gap marker if the times align perfectly.
+                              if (!isFirstSegmentInLoop || segment.startTime > group.firstSegment.startTime) {
+                                // Only insert if the current segment START time is past the marker
+                                // (Prevents adding marker if a previous segment ended exactly at the 2min mark)
+                                elements.push(
+                                  <div 
+                                    key={`interval-separator-${i}`} 
+                                    // Style for regular interval marker (no border)
+                                    className="text-xs font-semibold text-gray-600 mt-3 mb-1 pt-1"
+                                  >
+                                    [{formatTime(segment.startTime)}]
+                                  </div>
+                                );
+                                // Update marker time. Use segment start time for simplicity.
+                                lastMarkerTime = segment.startTime; 
+                                separatorInserted = true; // Technically true, prevents double checks
+                              }
+                            }
+
+                            // Add the actual segment text
+                            elements.push(<div key={`segment-text-${i}`}>{segment.text}</div>);
+                            isFirstSegmentInLoop = false; // Mark as processed
+                          });
+
+                          return elements;
+                        })()}
                       </div>
                     </div>
                   );
@@ -452,6 +584,9 @@ const TranscriptAnalyzer = () => {
                   return (
                     <div 
                       key={`segment-${index}`} 
+                      // Add data attributes for the segment's time range
+                      data-starttime={segment.startTime}
+                      data-endtime={segment.endTime}
                       className="mb-3 p-2 rounded" // No highlight when showing all
                     >
                       <div className="font-mono text-xs text-gray-500 mb-1">

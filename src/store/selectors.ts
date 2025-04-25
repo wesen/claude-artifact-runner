@@ -1,5 +1,5 @@
-import { RootState } from './index';
-import { TranscriptSegment, Topic, TimeRange } from '../utils/transcriptUtils';
+import { RootState } from './index.ts';
+import { TranscriptSegment, Topic, TimeRange } from '../utils/transcriptUtils.ts';
 import { createSelector } from '@reduxjs/toolkit';
 
 // Transcript selectors
@@ -23,6 +23,9 @@ export const selectTopicInfoCopied = (state: RootState): boolean => state.ui.top
 export const selectTranscriptViewCopied = (state: RootState): boolean => state.ui.transcriptViewCopied;
 export const selectBlogPromptCopied = (state: RootState): boolean => state.ui.blogPromptCopied;
 export const selectSubtopicsPromptCopied = (state: RootState): boolean => state.ui.subtopicsPromptCopied;
+export const selectShowPromptModal = (state: RootState): boolean => state.ui.showPromptModal;
+export const selectPromptModalContent = (state: RootState): string => state.ui.promptModalContent;
+export const selectPromptModalTitle = (state: RootState): string => state.ui.promptModalTitle;
 
 // Combined selectors
 export const selectAllTopics = createSelector(

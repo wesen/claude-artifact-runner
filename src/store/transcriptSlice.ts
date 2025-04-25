@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { TranscriptSegment, parseTranscript } from '../utils/transcriptUtils';
 
-interface TranscriptState {
+export interface TranscriptState {
   rawTranscript: string;
   parsedTranscript: TranscriptSegment[];
   loading: boolean;

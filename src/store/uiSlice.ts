@@ -1,13 +1,16 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { AppDispatch } from './index';
 
-interface UiState {
+export interface UiState {
   showDebugInfo: boolean;
   promptCopied: boolean;
   topicInfoCopied: boolean;
   transcriptViewCopied: boolean;
   blogPromptCopied: boolean;
   subtopicsPromptCopied: boolean;
+  showPromptModal: boolean;
+  promptModalContent: string;
+  promptModalTitle: string;
 }
 
 const initialState: UiState = {
@@ -17,6 +20,9 @@ const initialState: UiState = {
   transcriptViewCopied: false,
   blogPromptCopied: false,
   subtopicsPromptCopied: false,
+  showPromptModal: false,
+  promptModalContent: '',
+  promptModalTitle: '',
 };
 
 export const uiSlice = createSlice({
@@ -26,11 +32,11 @@ export const uiSlice = createSlice({
     toggleDebugInfo: (state) => {
       state.showDebugInfo = !state.showDebugInfo;
     },
-    setCopyStatus: (state, action: PayloadAction<{field: keyof UiState; status: boolean}>) => {
+    setCopyStatus: (state, action: PayloadAction<{field: keyof Pick<UiState, 'promptCopied' | 'topicInfoCopied' | 'transcriptViewCopied' | 'blogPromptCopied' | 'subtopicsPromptCopied'>; status: boolean}>) => {
       const { field, status } = action.payload;
       // Only update if the field exists in our state
       if (field in state) {
-        state[field] = status;
+        state[field as keyof Pick<UiState, 'promptCopied' | 'topicInfoCopied' | 'transcriptViewCopied' | 'blogPromptCopied' | 'subtopicsPromptCopied'>] = status;
       }
     },
     resetAllCopyStatus: (state) => {
@@ -40,11 +46,17 @@ export const uiSlice = createSlice({
       state.blogPromptCopied = false;
       state.subtopicsPromptCopied = false;
     },
+    setPromptModal: (state, action: PayloadAction<{show: boolean; content?: string; title?: string}>) => {
+      const { show, content, title } = action.payload;
+      state.showPromptModal = show;
+      if (content !== undefined) state.promptModalContent = content;
+      if (title !== undefined) state.promptModalTitle = title;
+    },
   },
 });
 
 // Function to handle copy with timeout to reset status
-export const copyWithFeedback = (text: string, fieldName: keyof UiState) => (dispatch: AppDispatch) => {
+export const copyWithFeedback = (text: string, fieldName: keyof Pick<UiState, 'promptCopied' | 'topicInfoCopied' | 'transcriptViewCopied' | 'blogPromptCopied' | 'subtopicsPromptCopied'>) => (dispatch: AppDispatch) => {
   navigator.clipboard.writeText(text)
     .then(() => {
       dispatch(setCopyStatus({ field: fieldName, status: true }));
@@ -59,6 +71,6 @@ export const copyWithFeedback = (text: string, fieldName: keyof UiState) => (dis
     });
 };
 
-export const { toggleDebugInfo, setCopyStatus, resetAllCopyStatus } = uiSlice.actions;
+export const { toggleDebugInfo, setCopyStatus, resetAllCopyStatus, setPromptModal } = uiSlice.actions;
 
 export default uiSlice.reducer; 
