@@ -1,14 +1,11 @@
-import { useState, useRef, useMemo } from 'react';
+import { useRef, useMemo } from 'react';
 // Import the prompt text as a raw string
 import promptText from '../../tests/transcript-editor/prompt.txt?raw';
 // Import utilities
 import { 
   TranscriptSegment, 
-  TimeRange, 
   Topic, 
   SegmentGroup,
-  parseTimestamp, 
-  parseTranscript, 
   formatTime, 
   groupConsecutiveSegments 
 } from '../utils/transcriptUtils';
@@ -16,6 +13,38 @@ import {
 // Import prompt templates
 import blogArticlePrompt from '../prompts/transcript-editor/blog-article.txt?raw';
 import subtopicsTweetsPrompt from '../prompts/transcript-editor/subtopics-tweets.txt?raw';
+
+// Import Redux hooks and actions
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { 
+  setTranscriptLoading, 
+  setTranscriptData, 
+  setTranscriptError 
+} from '../store/transcriptSlice';
+import { 
+  setTopicsLoading, 
+  setTopicsData, 
+  setTopicsError, 
+  setSelectedTopic 
+} from '../store/topicsSlice';
+import { 
+  toggleDebugInfo, 
+  copyWithFeedback 
+} from '../store/uiSlice';
+import {
+  selectParsedTranscript,
+  selectRawTranscript,
+  selectSpecificTopics,
+  selectGeneralTopics,
+  selectSelectedTopic,
+  selectSelectedTopicRanges,
+  selectShowDebugInfo,
+  selectPromptCopied,
+  selectTopicInfoCopied,
+  selectTranscriptViewCopied,
+  selectBlogPromptCopied,
+  selectSubtopicsPromptCopied
+} from '../store/selectors';
 
 // Controls console logging
 const isDebug = process.env.NODE_ENV === 'development';
@@ -28,30 +57,39 @@ const debugLog = (...args: unknown[]) => {
 };
 
 const TranscriptAnalyzer = () => {
-  const [transcript, setTranscript] = useState('');
-  const [parsedTranscript, setParsedTranscript] = useState<TranscriptSegment[]>([]);
-  const [topics, setTopics] = useState<{ specific_topics: Topic[]; general_topics: Topic[] }>({ specific_topics: [], general_topics: [] });
-  const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
-  const [topicRanges, setTopicRanges] = useState<TimeRange[]>([]);
+  // Use Redux selectors to get state
+  const parsedTranscript = useAppSelector(selectParsedTranscript);
+  const transcript = useAppSelector(selectRawTranscript);
+  const specificTopics = useAppSelector(selectSpecificTopics);
+  const generalTopics = useAppSelector(selectGeneralTopics);
+  const selectedTopic = useAppSelector(selectSelectedTopic);
+  const topicRanges = useAppSelector(selectSelectedTopicRanges);
+  const showDebugInfo = useAppSelector(selectShowDebugInfo);
+  const promptCopied = useAppSelector(selectPromptCopied);
+  const topicInfoCopied = useAppSelector(selectTopicInfoCopied);
+  const transcriptViewCopied = useAppSelector(selectTranscriptViewCopied);
+  const blogPromptCopied = useAppSelector(selectBlogPromptCopied);
+  const subtopicsPromptCopied = useAppSelector(selectSubtopicsPromptCopied);
+  
+  const dispatch = useAppDispatch();
   const transcriptRef = useRef<HTMLDivElement>(null);
-  const [showDebugInfo, setShowDebugInfo] = useState(false);
-  // State for copy feedback
-  const [promptCopied, setPromptCopied] = useState(false);
-  const [topicInfoCopied, setTopicInfoCopied] = useState(false);
-  const [transcriptViewCopied, setTranscriptViewCopied] = useState(false);
-  const [blogPromptCopied, setBlogPromptCopied] = useState(false);
-  const [subtopicsPromptCopied, setSubtopicsPromptCopied] = useState(false);
 
   const handleTranscriptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    dispatch(setTranscriptLoading());
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      if (!text) return;
-      setTranscript(text);
-      setParsedTranscript(parseTranscript(text, isDebug));
+      if (!text) {
+        dispatch(setTranscriptError('Failed to read file'));
+        return;
+      }
+      dispatch(setTranscriptData(text));
+    };
+    reader.onerror = () => {
+      dispatch(setTranscriptError('Error reading file'));
     };
     reader.readAsText(file);
   };
@@ -60,52 +98,36 @@ const TranscriptAnalyzer = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    dispatch(setTopicsLoading());
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const json = JSON.parse(e.target?.result as string);
-        setTopics(json);
-        // Reset selected topic and ranges when new JSON is loaded
-        setSelectedTopic(null);
-        setTopicRanges([]);
+        dispatch(setTopicsData(json));
       } catch (error) {
         console.error("Failed to parse JSON:", error);
+        dispatch(setTopicsError('Invalid JSON file'));
         alert("Invalid JSON file");
       }
+    };
+    reader.onerror = () => {
+      dispatch(setTopicsError('Error reading file'));
     };
     reader.readAsText(file);
   };
 
   const handleTopicClick = (topic: Topic, category: string) => {
     debugLog("Topic clicked:", topic, "Category:", category);
-    if (selectedTopic && selectedTopic.name === topic.name) {
-      debugLog("Deselecting topic:", topic.name);
-      setSelectedTopic(null);
-      setTopicRanges([]);
-    } else {
-      debugLog("Selecting topic:", topic.name);
-      setSelectedTopic({ ...topic, category });
-      
-      // Parse time ranges for the topic
-      const ranges: TimeRange[] = [];
-      topic.time_ranges.forEach((range: { start: string; end: string }) => {
-        const start = parseTimestamp(range.start);
-        const end = parseTimestamp(range.end);
-        debugLog(`Parsed time range for topic ${topic.name}: ${range.start}-${range.end} => ${start}-${end}`);
-        ranges.push({ start, end });
-      });
-      setTopicRanges(ranges);
-      debugLog("Set topic ranges:", ranges);
-      
-      // Scroll to the first occurrence
-      if (ranges.length > 0 && transcriptRef.current) {
-        setTimeout(() => {
-          const firstHighlight = transcriptRef.current?.querySelector('.highlight');
-          if (firstHighlight) {
-            firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }, 100);
-      }
+    dispatch(setSelectedTopic({ topic, category }));
+    
+    // Scroll to the first occurrence after the state update
+    if (topicRanges.length > 0 && transcriptRef.current) {
+      setTimeout(() => {
+        const firstHighlight = transcriptRef.current?.querySelector('.highlight');
+        if (firstHighlight) {
+          firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
     }
   };
 
@@ -139,17 +161,6 @@ const TranscriptAnalyzer = () => {
   const isSignificantTimeGap = (current: TranscriptSegment, previous: TranscriptSegment): boolean => {
     // 120 seconds = 2 minutes
     return (current.startTime - previous.endTime) > 120;
-  };
-
-  // Generic copy handler with feedback
-  const handleCopy = (textToCopy: string, setCopiedState: (copied: boolean) => void) => {
-    navigator.clipboard.writeText(textToCopy).then(() => {
-      setCopiedState(true);
-      setTimeout(() => setCopiedState(false), 2000); // Reset after 2 seconds
-    }, (err) => {
-      console.error('Failed to copy: ', err);
-      alert('Failed to copy text.');
-    });
   };
 
   // Function to apply a prompt template with current data
@@ -194,26 +205,26 @@ const TranscriptAnalyzer = () => {
   const handleCopyBlogArticlePrompt = () => {
     const filledPrompt = applyPromptTemplate(blogArticlePrompt);
     if (filledPrompt) {
-      handleCopy(filledPrompt, setBlogPromptCopied);
+      dispatch(copyWithFeedback(filledPrompt, 'blogPromptCopied'));
     }
   };
 
   const handleCopySubtopicsPrompt = () => {
     const filledPrompt = applyPromptTemplate(subtopicsTweetsPrompt);
     if (filledPrompt) {
-      handleCopy(filledPrompt, setSubtopicsPromptCopied);
+      dispatch(copyWithFeedback(filledPrompt, 'subtopicsPromptCopied'));
     }
   };
 
   // Specific copy handlers
   const handleCopyPrompt = () => {
-    handleCopy(promptText, setPromptCopied);
+    dispatch(copyWithFeedback(promptText, 'promptCopied'));
   };
 
   const handleCopyTopicInfo = () => {
     if (!selectedTopic) return;
     const topicInfoString = `Topic: ${selectedTopic.name}\n\nInformation:\n${selectedTopic.information}\n\nKey Quotes:\n${selectedTopic.key_quotes.map(q => `- ${q}`).join('\n')}\n\nTime Ranges:\n${selectedTopic.time_ranges.map(r => `- ${r.start} - ${r.end}`).join('\n')}\n`;
-    handleCopy(topicInfoString, setTopicInfoCopied);
+    dispatch(copyWithFeedback(topicInfoString, 'topicInfoCopied'));
   };
 
   const handleCopyTranscriptView = () => {
@@ -246,7 +257,7 @@ const TranscriptAnalyzer = () => {
       }
     });
 
-    handleCopy(transcriptString.trim(), setTranscriptViewCopied);
+    dispatch(copyWithFeedback(transcriptString.trim(), 'transcriptViewCopied'));
   };
 
   // Render the Prompt Toolbar component
@@ -311,10 +322,7 @@ const TranscriptAnalyzer = () => {
         {selectedTopic ? (
           <button 
             className="mb-4 px-3 py-1 bg-gray-200 rounded text-sm"
-            onClick={() => {
-              setSelectedTopic(null);
-              setTopicRanges([]);
-            }}
+            onClick={() => dispatch(setSelectedTopic(null))}
           >
             ← Back to all topics
           </button>
@@ -323,7 +331,7 @@ const TranscriptAnalyzer = () => {
         <div>
           <h3 className="font-bold text-blue-600 mb-2">Specific Topics</h3>
           <ul className="mb-4">
-            {topics.specific_topics.map((topic, index) => (
+            {specificTopics.map((topic, index) => (
               <li 
                 key={`specific-${index}`}
                 className={`p-2 mb-1 rounded cursor-pointer hover:bg-gray-100 ${selectedTopic && selectedTopic.name === topic.name ? 'bg-blue-100' : ''}`}
@@ -336,7 +344,7 @@ const TranscriptAnalyzer = () => {
           
           <h3 className="font-bold text-green-600 mb-2">General Topics</h3>
           <ul>
-            {topics.general_topics.map((topic, index) => (
+            {generalTopics.map((topic, index) => (
               <li 
                 key={`general-${index}`}
                 className={`p-2 mb-1 rounded cursor-pointer hover:bg-gray-100 ${selectedTopic && selectedTopic.name === topic.name ? 'bg-green-100' : ''}`}
@@ -466,7 +474,7 @@ const TranscriptAnalyzer = () => {
         <div className="mt-4">
            <button 
              className="text-sm text-blue-600 hover:underline"
-             onClick={() => setShowDebugInfo(!showDebugInfo)}
+             onClick={() => dispatch(toggleDebugInfo())}
            >
              {showDebugInfo ? 'Hide' : 'Show'} Parsed Segments Debug Info
            </button>
