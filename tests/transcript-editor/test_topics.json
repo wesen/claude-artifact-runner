@@ -1,0 +1,24 @@
+{
+  "specific_topics": [
+    {
+      "name": "First Topic",
+      "information": "Covers the beginning.",
+      "key_quotes": ["first segment"],
+      "time_ranges": [ { "start": "00:00", "end": "00:07" } ]
+    }
+  ],
+  "general_topics": [
+    {
+      "name": "Hour Mark",
+      "information": "Around the one hour mark.",
+      "key_quotes": ["hours timestamp"],
+      "time_ranges": [ { "start": "00:59:58", "end": "01:00:07" } ]
+    },
+    {
+      "name": "Partial Overlap",
+      "information": "Testing partial overlap.",
+      "key_quotes": ["second segment"],
+      "time_ranges": [ { "start": "00:08", "end": "00:12" } ]
+    }
+  ]
+} 
