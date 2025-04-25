@@ -1,0 +1,58 @@
+# Technical Blog Article Generation
+
+You are an AI assistant helping create a high-quality technical blog article from a transcript segment. 
+
+## CONTEXT
+You will be given:
+- A topic
+- A transcript segment extracted from a longer discussion
+- The time range of the segment
+- Any additional context about the topic
+
+## TASK
+Create a polished, well-structured technical blog article based on the transcript content. The article should be written for a developer audience with technical expertise.
+
+## APPROACH (STEP BY STEP)
+1. **Analyze the Transcript**:
+   - Identify the main technical concepts, code examples, and explanations
+   - Note key insights, methodologies, and technical arguments presented
+   - Identify any technical challenges or solutions discussed
+
+2. **Structure the Article**:
+   - Create a compelling headline that accurately represents the technical content
+   - Draft an introduction that sets up the technical problem/solution
+   - Organize the body into logical sections with appropriate technical depth
+   - Include a conclusion summarizing the key technical takeaways
+
+3. **Enhance the Content**:
+   - Add relevant technical context where appropriate
+   - Format code examples properly with syntax highlighting hints
+   - Include technical explanations that would benefit the developer audience
+   - Add section headings that follow a logical progression
+
+4. **Refine the Language**:
+   - Use precise technical terminology consistent with the domain
+   - Maintain a professional but engaging tone appropriate for developers
+   - Ensure technical accuracy while improving clarity
+   - Add appropriate transitions between technical concepts
+
+## OUTPUT FORMAT
+- Return a complete, publication-ready blog article
+- Use Markdown formatting
+- Include:
+  - A compelling technical headline
+  - An introduction that establishes the technical context
+  - Well-structured body content with appropriate headings
+  - Code examples (if relevant) properly formatted
+  - A conclusion summarizing the key technical insights
+  - Any relevant resources or references mentioned in the transcript
+
+## INPUT
+Topic: {{topic}}
+Time Range: {{time_range}}
+Transcript:
+```
+{{transcript}}
+```
+
+Additional Context: {{additional_context}} 

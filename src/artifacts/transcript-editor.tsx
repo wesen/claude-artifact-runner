@@ -1,31 +1,31 @@
 import { useState, useRef, useMemo } from 'react';
 // Import the prompt text as a raw string
 import promptText from '../../tests/transcript-editor/prompt.txt?raw';
+// Import utilities
+import { 
+  TranscriptSegment, 
+  TimeRange, 
+  Topic, 
+  SegmentGroup,
+  parseTimestamp, 
+  parseTranscript, 
+  formatTime, 
+  groupConsecutiveSegments 
+} from '../utils/transcriptUtils';
 
-interface TranscriptSegment {
-  startTime: number;
-  endTime: number;
-  text: string;
-}
+// Import prompt templates
+import blogArticlePrompt from '../prompts/transcript-editor/blog-article.txt?raw';
+import subtopicsTweetsPrompt from '../prompts/transcript-editor/subtopics-tweets.txt?raw';
 
-interface TimeRange {
-  start: number;
-  end: number;
-}
+// Controls console logging
+const isDebug = process.env.NODE_ENV === 'development';
 
-interface Topic {
-  name: string;
-  information: string;
-  key_quotes: string[];
-  time_ranges: { start: string; end: string }[];
-  category?: string;
-}
-
-interface SegmentGroup {
-  firstSegment: TranscriptSegment;
-  lastSegment: TranscriptSegment;
-  segments: TranscriptSegment[];
-}
+// Wrapper for debug logging
+const debugLog = (...args: unknown[]) => {
+  if (isDebug) {
+    console.log(...args);
+  }
+};
 
 const TranscriptAnalyzer = () => {
   const [transcript, setTranscript] = useState('');
@@ -39,60 +39,8 @@ const TranscriptAnalyzer = () => {
   const [promptCopied, setPromptCopied] = useState(false);
   const [topicInfoCopied, setTopicInfoCopied] = useState(false);
   const [transcriptViewCopied, setTranscriptViewCopied] = useState(false);
-
-  const parseTimestamp = (timestamp: string) => {
-    const parts = timestamp.split(':');
-    let seconds = 0;
-    if (parts.length === 2) {
-      seconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
-    } else if (parts.length === 3) {
-      seconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
-    }
-    return seconds;
-  };
-
-  const parseTranscript = (text: string): TranscriptSegment[] => {
-    console.log("Parsing transcript text:", text);
-    const lines = text.split('\n');
-    const segments: TranscriptSegment[] = [];
-    let currentSegment: TranscriptSegment | null = null;
-
-    lines.forEach((line, index) => {
-      console.log(`Processing line ${index + 1}:`, line);
-      const timestampMatch = line.match(/(?:(\d{2}):)?(\d{2}:\d{2})-(?:(\d{2}):)?(\d{2}:\d{2})/);
-      if (timestampMatch) {
-        console.log("Timestamp match found:", timestampMatch[0]);
-        if (currentSegment) {
-          console.log("Pushing previous segment:", currentSegment);
-          segments.push(currentSegment);
-        }
-        const startStr = timestampMatch[1] ? `${timestampMatch[1]}:${timestampMatch[2]}` : timestampMatch[2];
-        const endStr = timestampMatch[3] ? `${timestampMatch[3]}:${timestampMatch[4]}` : timestampMatch[4];
-
-        const startTime = parseTimestamp(startStr);
-        const endTime = parseTimestamp(endStr);
-        currentSegment = {
-          startTime: startTime,
-          endTime: endTime,
-          text: line.replace(timestampMatch[0], '').trim()
-        };
-        console.log("Created new segment:", currentSegment);
-      } else if (currentSegment && line.trim() !== '') {
-        console.log("Appending text to current segment:", line.trim());
-        currentSegment.text += ' ' + line.trim();
-      } else {
-        console.log("Skipping line (no timestamp match or empty line):", line);
-      }
-    });
-
-    if (currentSegment) {
-      console.log("Pushing final segment:", currentSegment);
-      segments.push(currentSegment);
-    }
-
-    console.log("Parsed transcript segments:", segments);
-    return segments;
-  };
+  const [blogPromptCopied, setBlogPromptCopied] = useState(false);
+  const [subtopicsPromptCopied, setSubtopicsPromptCopied] = useState(false);
 
   const handleTranscriptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -103,7 +51,7 @@ const TranscriptAnalyzer = () => {
       const text = e.target?.result as string;
       if (!text) return;
       setTranscript(text);
-      setParsedTranscript(parseTranscript(text));
+      setParsedTranscript(parseTranscript(text, isDebug));
     };
     reader.readAsText(file);
   };
@@ -129,13 +77,13 @@ const TranscriptAnalyzer = () => {
   };
 
   const handleTopicClick = (topic: Topic, category: string) => {
-    console.log("Topic clicked:", topic, "Category:", category);
+    debugLog("Topic clicked:", topic, "Category:", category);
     if (selectedTopic && selectedTopic.name === topic.name) {
-      console.log("Deselecting topic:", topic.name);
+      debugLog("Deselecting topic:", topic.name);
       setSelectedTopic(null);
       setTopicRanges([]);
     } else {
-      console.log("Selecting topic:", topic.name);
+      debugLog("Selecting topic:", topic.name);
       setSelectedTopic({ ...topic, category });
       
       // Parse time ranges for the topic
@@ -143,11 +91,11 @@ const TranscriptAnalyzer = () => {
       topic.time_ranges.forEach((range: { start: string; end: string }) => {
         const start = parseTimestamp(range.start);
         const end = parseTimestamp(range.end);
-        console.log(`Parsed time range for topic ${topic.name}: ${range.start}-${range.end} => ${start}-${end}`);
+        debugLog(`Parsed time range for topic ${topic.name}: ${range.start}-${range.end} => ${start}-${end}`);
         ranges.push({ start, end });
       });
       setTopicRanges(ranges);
-      console.log("Set topic ranges:", ranges);
+      debugLog("Set topic ranges:", ranges);
       
       // Scroll to the first occurrence
       if (ranges.length > 0 && transcriptRef.current) {
@@ -174,77 +122,6 @@ const TranscriptAnalyzer = () => {
     return isInRange;
   };
   
-  const formatTime = (seconds: number): string => {
-    if (seconds < 0) seconds = 0; // Handle potential negative values if needed
-
-    const totalSeconds = Math.floor(seconds);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const secs = totalSeconds % 60;
-
-    if (hours > 0) {
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    
-    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Helper function to group consecutive segments from the filtered list
-  const groupConsecutiveSegments = (
-    allSegments: TranscriptSegment[],
-    filteredSegments: TranscriptSegment[]
-  ): SegmentGroup[] => {
-    if (filteredSegments.length === 0) {
-      return [];
-    }
-
-    const groups: SegmentGroup[] = [];
-    if (allSegments.length === 0 || filteredSegments.length === 0) return groups;
-
-    let currentGroup: TranscriptSegment[] = [];
-    const segmentIndexMap = new Map(allSegments.map((seg, index) => [seg, index]));
-
-    for (let i = 0; i < filteredSegments.length; i++) {
-      const currentSegment = filteredSegments[i];
-      const currentSegmentIndex = segmentIndexMap.get(currentSegment);
-
-      if (currentGroup.length === 0) {
-        // Start a new group
-        currentGroup.push(currentSegment);
-      } else {
-        const prevSegmentInGroup = currentGroup[currentGroup.length - 1];
-        const prevSegmentIndex = segmentIndexMap.get(prevSegmentInGroup);
-
-        // Check if the current segment immediately follows the previous one in the *original* transcript
-        // and if its index exists
-        if (currentSegmentIndex !== undefined && prevSegmentIndex !== undefined && currentSegmentIndex === prevSegmentIndex + 1) {
-          currentGroup.push(currentSegment);
-        } else {
-          // End the current group and start a new one
-          if (currentGroup.length > 0) {
-             groups.push({
-              firstSegment: currentGroup[0],
-              lastSegment: currentGroup[currentGroup.length - 1],
-              segments: currentGroup,
-            });
-          }
-          currentGroup = [currentSegment];
-        }
-      }
-    }
-
-    // Push the last group
-    if (currentGroup.length > 0) {
-      groups.push({
-        firstSegment: currentGroup[0],
-        lastSegment: currentGroup[currentGroup.length - 1],
-        segments: currentGroup,
-      });
-    }
-
-    return groups;
-  };
-
   // Memoize the filtered and grouped segments
   const displayedContent = useMemo(() => {
     const filteredSegments = parsedTranscript.filter(segment => !selectedTopic || isSegmentInRange(segment));
@@ -258,6 +135,12 @@ const TranscriptAnalyzer = () => {
     }
   }, [parsedTranscript, selectedTopic, topicRanges]); // Dependencies for useMemo
 
+  // Check if there's a significant time gap between segments (over 2 minutes)
+  const isSignificantTimeGap = (current: TranscriptSegment, previous: TranscriptSegment): boolean => {
+    // 120 seconds = 2 minutes
+    return (current.startTime - previous.endTime) > 120;
+  };
+
   // Generic copy handler with feedback
   const handleCopy = (textToCopy: string, setCopiedState: (copied: boolean) => void) => {
     navigator.clipboard.writeText(textToCopy).then(() => {
@@ -269,6 +152,59 @@ const TranscriptAnalyzer = () => {
     });
   };
 
+  // Function to apply a prompt template with current data
+  const applyPromptTemplate = (promptTemplate: string): string => {
+    if (!selectedTopic) {
+      alert('Please select a topic first.');
+      return '';
+    }
+
+    let filledPrompt = promptTemplate;
+    
+    // Get the displayed transcript content as text
+    let transcriptContent = '';
+    displayedContent.forEach(item => {
+      if ('segments' in item) {
+        // Grouped segment block
+        const group = item as SegmentGroup;
+        group.segments.forEach(segment => {
+          transcriptContent += segment.text + '\n';
+        });
+      } else {
+        // Individual segment
+        const segment = item as TranscriptSegment;
+        transcriptContent += segment.text + '\n';
+      }
+    });
+
+    // Get the time range as string
+    const timeRanges = selectedTopic.time_ranges.map(range => `${range.start} - ${range.end}`).join(', ');
+    
+    // Replace template variables
+    filledPrompt = filledPrompt
+      .replace('{{topic}}', selectedTopic.name)
+      .replace('{{time_range}}', timeRanges)
+      .replace('{{transcript}}', transcriptContent)
+      .replace('{{additional_context}}', selectedTopic.information || '');
+    
+    return filledPrompt;
+  };
+
+  // Handlers for prompt application and copy
+  const handleCopyBlogArticlePrompt = () => {
+    const filledPrompt = applyPromptTemplate(blogArticlePrompt);
+    if (filledPrompt) {
+      handleCopy(filledPrompt, setBlogPromptCopied);
+    }
+  };
+
+  const handleCopySubtopicsPrompt = () => {
+    const filledPrompt = applyPromptTemplate(subtopicsTweetsPrompt);
+    if (filledPrompt) {
+      handleCopy(filledPrompt, setSubtopicsPromptCopied);
+    }
+  };
+
   // Specific copy handlers
   const handleCopyPrompt = () => {
     handleCopy(promptText, setPromptCopied);
@@ -276,17 +212,7 @@ const TranscriptAnalyzer = () => {
 
   const handleCopyTopicInfo = () => {
     if (!selectedTopic) return;
-    const topicInfoString = `Topic: ${selectedTopic.name}
-
-Information:
-${selectedTopic.information}
-
-Key Quotes:
-${selectedTopic.key_quotes.map(q => `- ${q}`).join('\n')}
-
-Time Ranges:
-${selectedTopic.time_ranges.map(r => `- ${r.start} - ${r.end}`).join('\n')}
-`;
+    const topicInfoString = `Topic: ${selectedTopic.name}\n\nInformation:\n${selectedTopic.information}\n\nKey Quotes:\n${selectedTopic.key_quotes.map(q => `- ${q}`).join('\n')}\n\nTime Ranges:\n${selectedTopic.time_ranges.map(r => `- ${r.start} - ${r.end}`).join('\n')}\n`;
     handleCopy(topicInfoString, setTopicInfoCopied);
   };
 
@@ -299,7 +225,19 @@ ${selectedTopic.time_ranges.map(r => `- ${r.start} - ${r.end}`).join('\n')}
         // Grouped segment block
         const group = item as SegmentGroup;
         transcriptString += `${formatTime(group.firstSegment.startTime)}-${formatTime(group.lastSegment.endTime)}\n`;
-        transcriptString += group.segments.map(s => s.text).join('\n') + '\n\n';
+        
+        // Process segments with potential time gaps
+        let lastSegment: TranscriptSegment | null = null;
+        group.segments.forEach(segment => {
+          if (lastSegment && isSignificantTimeGap(segment, lastSegment)) {
+            // Insert timestamp if gap is more than 2 minutes
+            transcriptString += `\n[${formatTime(segment.startTime)}]\n`;
+          }
+          transcriptString += segment.text + '\n';
+          lastSegment = segment;
+        });
+        
+        transcriptString += '\n';
       } else {
         // Individual segment
         const segment = item as TranscriptSegment;
@@ -309,6 +247,35 @@ ${selectedTopic.time_ranges.map(r => `- ${r.start} - ${r.end}`).join('\n')}
     });
 
     handleCopy(transcriptString.trim(), setTranscriptViewCopied);
+  };
+
+  // Render the Prompt Toolbar component
+  const PromptToolbar = () => {
+    return (
+      <div className="mb-4 bg-gray-100 p-3 rounded shadow">
+        <h3 className="text-md font-bold mb-2">Prompt Tools</h3>
+        <div className="flex space-x-2">
+          <button
+            className={`px-3 py-2 rounded text-sm ${blogPromptCopied ? 'bg-green-300' : 'bg-green-100 hover:bg-green-200'}`}
+            onClick={handleCopyBlogArticlePrompt}
+            disabled={blogPromptCopied || !selectedTopic}
+          >
+            {blogPromptCopied ? 'Blog Prompt Copied!' : 'Create Blog Article Prompt'}
+          </button>
+          
+          <button
+            className={`px-3 py-2 rounded text-sm ${subtopicsPromptCopied ? 'bg-purple-300' : 'bg-purple-100 hover:bg-purple-200'}`}
+            onClick={handleCopySubtopicsPrompt}
+            disabled={subtopicsPromptCopied || !selectedTopic}
+          >
+            {subtopicsPromptCopied ? 'Subtopics Prompt Copied!' : 'Create Subtopics & Tweets Prompt'}
+          </button>
+        </div>
+        <div className="mt-2 text-xs text-gray-500">
+          {!selectedTopic ? 'Select a topic to enable prompt tools' : 'Click a button to fill the template with current data and copy to clipboard'}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -409,6 +376,9 @@ ${selectedTopic.time_ranges.map(r => `- ${r.start} - ${r.end}`).join('\n')}
           </div>
         )}
         
+        {/* Add Prompt Toolbar */}
+        {selectedTopic && parsedTranscript.length > 0 && <PromptToolbar />}
+        
         {/* Add Copy Transcript View Button */} 
         {parsedTranscript.length > 0 && (
           <div className="mb-2 text-right">
@@ -448,9 +418,23 @@ ${selectedTopic.time_ranges.map(r => `- ${r.start} - ${r.end}`).join('\n')}
                       <div className="font-mono text-xs text-gray-500 mb-1">
                         {formatTime(group.firstSegment.startTime)}-{formatTime(group.lastSegment.endTime)}
                       </div>
-                      {/* Join text with newlines */}
-                      <div style={{ whiteSpace: 'pre-line' }}> 
-                        {group.segments.map(s => s.text).join('\n')}
+                      {/* Render segments with timestamps for gaps greater than 2 minutes */}
+                      <div style={{ whiteSpace: 'pre-line' }}>
+                        {group.segments.reduce((acc, segment, i) => {
+                          if (i > 0) {
+                            const previousSegment = group.segments[i - 1];
+                            if (isSignificantTimeGap(segment, previousSegment)) {
+                              // Add a timestamp if there's a significant gap
+                              acc.push(
+                                <div key={`timestamp-${i}`} className="text-xs font-semibold text-gray-600 mt-2 mb-1">
+                                  [{formatTime(segment.startTime)}]
+                                </div>
+                              );
+                            }
+                          }
+                          acc.push(<div key={`segment-text-${i}`}>{segment.text}</div>);
+                          return acc;
+                        }, [] as React.ReactNode[])}
                       </div>
                     </div>
                   );
