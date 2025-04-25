@@ -47,19 +47,22 @@ const TranscriptAnalyzer = () => {
 
     lines.forEach((line, index) => {
       console.log(`Processing line ${index + 1}:`, line);
-      const timestampMatch = line.match(/(?:(\d{2}):)?(\d{2}:\d{2})-(?:\d{2}:)?(\d{2}:\d{2})/);
+      const timestampMatch = line.match(/(?:(\d{2}):)?(\d{2}:\d{2})-(?:(\d{2}):)?(\d{2}:\d{2})/);
       if (timestampMatch) {
         console.log("Timestamp match found:", timestampMatch[0]);
         if (currentSegment) {
           console.log("Pushing previous segment:", currentSegment);
           segments.push(currentSegment);
         }
-        const startTime = parseTimestamp(timestampMatch[1] ? `${timestampMatch[1]}:${timestampMatch[2]}` : timestampMatch[2]);
-        const endTime = parseTimestamp(timestampMatch[3]);
+        const startStr = timestampMatch[1] ? `${timestampMatch[1]}:${timestampMatch[2]}` : timestampMatch[2];
+        const endStr = timestampMatch[3] ? `${timestampMatch[3]}:${timestampMatch[4]}` : timestampMatch[4];
+
+        const startTime = parseTimestamp(startStr);
+        const endTime = parseTimestamp(endStr);
         currentSegment = {
           startTime: startTime,
           endTime: endTime,
-          text: line.replace(/(?:\d{2}:)?(?:\d{2}:\d{2})-(?:\d{2}:)?(?:\d{2}:\d{2})/, '').trim()
+          text: line.replace(timestampMatch[0], '').trim()
         };
         console.log("Created new segment:", currentSegment);
       } else if (currentSegment && line.trim() !== '') {
@@ -157,9 +160,18 @@ const TranscriptAnalyzer = () => {
   };
   
   const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    if (seconds < 0) seconds = 0; // Handle potential negative values if needed
+
+    const totalSeconds = Math.floor(seconds);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+
+    if (hours > 0) {
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
