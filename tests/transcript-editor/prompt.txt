@@ -1,0 +1,195 @@
+You will analyze a transcript (such as from an interview, podcast, video, or presentation) and extract targeted information about specific topics, creating a structured JSON output with detailed analysis.
+
+## Input
+- A transcript of spoken content with timestamps in HH:MM:SS format
+- A list of specific topics to focus on (e.g., "AI ethics", "climate solutions", "educational technology")
+
+## Output Format
+Create a JSON structure with these components:
+1. "specific_topics": An array of the requested topics found in the transcript
+2. "general_topics": An array of all significant topics identified in the transcript
+
+For each topic, include:
+- "name": A concise topic title
+- "information": A detailed summary of what was discussed
+- "key_quotes": 4-6 representative quotes from the transcript
+- "time_ranges": An array of time ranges where this topic appears (can include multiple segments)
+
+## Approach
+Let's think step by step:
+
+1. **Initial Reading**: First, read through the entire transcript to get a comprehensive understanding.
+
+2. **General Topic Identification**:
+   - Break down the transcript into logical segments based on content shifts
+   - For each segment, identify what general topic is being discussed
+   - Note the start and end timestamps for each segment
+   - Merge segments discussing the same topic, even if they're non-consecutive
+
+3. **Specific Topic Analysis**:
+   - For each requested topic, search throughout the transcript
+   - Extract relevant segments, even if they appear in multiple places
+   - Go beyond keyword matching to understand conceptual discussions of the topic
+   - Identify segments that relate to the topic even if not explicitly mentioned
+
+4. **Quote Selection**:
+   - Choose the most insightful, clear, and representative quotes
+   - Prefer quotes that capture the essence of the topic
+   - Include quotes that show different aspects or perspectives within the topic
+   - Maintain accurate quotation with minimal editing
+
+5. **Information Synthesis**:
+   - Write a comprehensive summary of each topic's treatment in the transcript
+   - Synthesize points made across different segments
+   - Focus on insights, patterns, and key arguments rather than just repeating content
+   - Keep summaries objective and faithful to the original content
+
+6. **Final Structure**:
+   - Format everything according to the requested JSON structure
+   - Verify all timestamps are accurate and in proper format
+   - Ensure quotes are accurately transcribed
+   - Check that all requested topics are addressed if they appear in the transcript
+
+## Detailed Analysis Process
+
+When analyzing the transcript, follow these more detailed guidelines:
+
+### For Identifying Topics
+1. Look for explicit topic changes signaled by phrases like "moving on to," "let's talk about," or "another thing is"
+2. Notice when the speaker introduces new concepts, technologies, theories, or examples
+3. Pay attention to shifts in tone, energy, or level of detail that might signal a topic change
+4. Consider how smaller subtopics relate to larger themes
+
+### For Extracting Time Ranges
+1. Mark when a topic is first introduced
+2. Track when the conversation returns to previously mentioned topics
+3. Note when a topic is concluded or transitions to another
+4. Merge adjacent or overlapping time segments about the same topic
+
+### For Selecting Key Quotes
+1. Prioritize quotes that define or explain the topic
+2. Include quotes that provide unique insights or perspectives
+3. Select quotes that demonstrate the speaker's expertise or personal experience
+4. Choose quotes that are concise and self-contained when possible
+
+## Example Output
+
+For a tech podcast discussing various subjects, if asked to focus on "AI development trends" and "tech industry ethics", the JSON output might look like:
+
+```json
+{
+  "specific_topics": [
+    {
+      "name": "AI Development Trends",
+      "information": "The speakers discussed the rapid evolution of large language models over the past two years, with particular emphasis on multimodal capabilities. They explored how models like GPT-4 and Claude have shifted industry focus from narrow AI applications to more general-purpose assistants. The conversation highlighted challenges around computational requirements, training data limitations, and the emergence of specialized AI for specific industries. Several predictions were made about the next 18 months of development, including more efficient training methods and increased focus on controllability and interpretability.",
+      "key_quotes": [
+        "We're seeing a fundamental shift from models that were good at one thing to models that can handle almost any task you throw at them, albeit with varying degrees of success.",
+        "The computational requirements are still staggering - we're talking about training runs that cost tens of millions of dollars and that's before you even get to inference costs.",
+        "What's interesting is how quickly enterprises have shifted from 'should we use AI?' to 'how quickly can we integrate this across all our systems?'",
+        "I think the next big frontier isn't just capabilities, it's actually making these systems trustworthy enough that people feel comfortable delegating important decisions to them.",
+        "The most promising research direction to me is finding ways to get similar performance with drastically reduced computing requirements - that's what will truly democratize AI development."
+      ],
+      "time_ranges": [
+        {"start": "00:05:27", "end": "00:18:42"},
+        {"start": "00:47:12", "end": "00:59:35"},
+        {"start": "01:22:05", "end": "01:25:47"}
+      ]
+    },
+    {
+      "name": "Tech Industry Ethics",
+      "information": "The discussion on tech ethics centered around responsible AI development practices and corporate accountability. Speakers debated the efficacy of self-regulation versus government oversight, with most agreeing that a balanced approach is necessary. They examined several recent controversies involving data privacy breaches and algorithmic bias, noting how public perception of tech companies has evolved. The conversation also touched on the growing movement of AI researchers advocating for cautious and thoughtful deployment, especially for technologies with significant societal impact. The speakers concluded that meaningful ethics requires structural changes in how technology is developed, not just surface-level policies.",
+      "key_quotes": [
+        "The problem with most ethics boards is they're set up to advise but have no actual power to stop a product launch when they identify serious concerns.",
+        "We're seeing this cycle where companies rush to market, apologize for the damage later, and treat the PR fallout as just a cost of doing business.",
+        "There's a fundamental tension between maximizing shareholder value and truly serving the public interest that tech companies haven't resolved.",
+        "What gives me hope is seeing more engineers and researchers speaking up from inside these companies - they're unwilling to just build whatever they're told to without considering consequences.",
+        "The shift from 'move fast and break things' to 'move carefully and fix things' is happening, but far too slowly given what's at stake."
+      ],
+      "time_ranges": [
+        {"start": "00:25:14", "end": "00:39:05"},
+        {"start": "01:05:22", "end": "01:19:47"}
+      ]
+    }
+  ],
+  "general_topics": [
+    {
+      "name": "Introduction and Podcast Overview",
+      "information": "The hosts introduced themselves and their backgrounds in the technology industry. They outlined the focus of the podcast as exploring the intersection of technology development and its impact on society, with particular emphasis on emerging technologies. They briefly mentioned the guests who would be joining later in the show and provided context about the podcast's history and mission.",
+      "key_quotes": [
+        "Welcome to Tech Horizons, where we explore not just what's possible, but what's responsible in the world of emerging technology.",
+        "I've spent the last decade working with startups trying to navigate the complex ethical questions that come with building new technologies.",
+        "What makes this podcast different is that we bring together voices from engineering, policy, business, and civil society - because these challenges require multidisciplinary solutions.",
+        "We don't claim to have all the answers, but we're committed to asking better questions."
+      ],
+      "time_ranges": [
+        {"start": "00:00:00", "end": "00:05:27"}
+      ]
+    },
+    {
+      "name": "AI Regulation Approaches",
+      "information": "The speakers compared regulatory approaches to AI across different regions including the European Union, United States, and China. They analyzed the EU AI Act in detail, discussing its risk-based categorization system and enforcement mechanisms. For the US, they noted the patchwork of state-level initiatives and executive orders in the absence of comprehensive federal legislation. The discussion also covered the challenges of creating regulations that can keep pace with rapidly developing technology while still providing meaningful safeguards. They debated whether regulation would stifle innovation or provide necessary boundaries for responsible development.",
+      "key_quotes": [
+        "The EU's approach is fundamentally different - they're starting with comprehensive rules before widespread deployment, whereas the US tends to regulate after problems emerge.",
+        "These regulatory frameworks aren't just technical details - they reflect deep cultural differences in how societies view the relationship between technology, individuals, and the state.",
+        "The problem isn't regulation versus no regulation - it's smart regulation versus clumsy regulation that either misses real risks or stifles beneficial innovation.",
+        "Companies actually benefit from clear rules - regulatory uncertainty can be more damaging than strict but predictable requirements."
+      ],
+      "time_ranges": [
+        {"start": "00:39:05", "end": "00:47:12"},
+        {"start": "01:25:47", "end": "01:42:30"}
+      ]
+    },
+    {
+      "name": "Open Source vs. Proprietary AI Models",
+      "information": "The discussion explored the tension between open-source and proprietary approaches to AI development. Speakers debated the security implications of widely available powerful models versus the innovation benefits of open collaboration. They examined case studies of both approaches, noting how organizations have developed hybrid models that balance openness with responsible deployment. The economic aspects were also analyzed, including how different funding models impact research priorities and access. The conversation concluded with reflections on how the field might evolve, with predictions about which approach might dominate in different application domains.",
+      "key_quotes": [
+        "Open source doesn't necessarily mean 'deploy without restrictions' - you can have open methods and code while still implementing thoughtful deployment policies.",
+        "The proprietary companies benefit enormously from open research, then lock their implementations behind APIs - it's a one-way flow of knowledge in many cases.",
+        "What we're seeing is that smaller, focused open-source models are often outperforming large proprietary models on specific tasks, even with far fewer resources.",
+        "The question isn't just open versus closed - it's about who has the power to decide how these technologies are used, and who benefits from their deployment.",
+        "Historical parallels with operating systems or the early internet only get us so far - AI has unique considerations around safety and security that weren't as pressing in earlier technological transitions."
+      ],
+      "time_ranges": [
+        {"start": "00:59:35", "end": "01:05:22"},
+        {"start": "01:42:30", "end": "01:57:15"}
+      ]
+    },
+    {
+      "name": "Future of Work and AI",
+      "information": "This segment focused on how AI technologies are reshaping employment across various sectors. The speakers discussed automation patterns, highlighting which job categories appear most vulnerable and which seem more resilient. They examined both historical patterns of technological disruption and unique aspects of current AI capabilities. The conversation also covered policy approaches to managing transitions, from universal basic income to education reform. Multiple perspectives were presented on whether AI would ultimately create more jobs than it displaces, with disagreement about timeframes and distribution of benefits.",
+      "key_quotes": [
+        "The pattern we've seen historically is that technology eliminates specific tasks rather than entire jobs, but generative AI is starting to challenge that assumption.",
+        "The transition period is what concerns me most - even if new jobs emerge eventually, we could see a decade or more of serious disruption without proper support systems.",
+        "Companies are already reorganizing work processes around AI capabilities, creating new roles that involve prompt engineering, output verification, and AI supervision.",
+        "The geographic impact will be uneven - regions with strong educational systems and adaptive labor policies will likely fare better than those with rigid structures.",
+        "What's different this time is the pace - previous industrial revolutions unfolded over generations, but these changes are happening within career spans."
+      ],
+      "time_ranges": [
+        {"start": "01:57:15", "end": "02:15:40"}
+      ]
+    }
+  ]
+}
+```
+
+## Additional Guidelines
+
+### Handling Complex Transcripts
+- For longer transcripts, focus on identifying major themes first, then drill down into specifics
+- When topics interweave or overlap significantly, prioritize clarity in your analysis
+- If speakers disagree about a topic, capture multiple perspectives in your summary
+- For technical content, ensure your topic summaries accurately reflect specialized terminology
+
+### Addressing Ambiguity
+- If a topic appears to be discussed but is unclear, note this in your summary
+- When timestamps are unclear or missing, provide your best estimate and note uncertainty
+- If a requested topic isn't discussed in the transcript, include it in your specific_topics list but note its absence
+- For topics that are mentioned very briefly, indicate the limited treatment in your summary
+
+### Handling Multiple Speakers
+- Attribute quotes to specific speakers when possible and relevant
+- Note significant differences in expertise or perspective among speakers
+- Capture dynamics between speakers (agreement, disagreement, building on ideas)
+- Distinguish between presenter content and audience questions if applicable
+
+Remember to remain objective in your analysis, avoid inserting opinions not present in the transcript, and focus on creating a comprehensive and accurate representation of the content.

@@ -1,4 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
+// Import the prompt text as a raw string
+import promptText from '../../tests/transcript-editor/prompt.txt?raw';
 
 interface TranscriptSegment {
   startTime: number;
@@ -19,6 +21,12 @@ interface Topic {
   category?: string;
 }
 
+interface SegmentGroup {
+  firstSegment: TranscriptSegment;
+  lastSegment: TranscriptSegment;
+  segments: TranscriptSegment[];
+}
+
 const TranscriptAnalyzer = () => {
   const [transcript, setTranscript] = useState('');
   const [parsedTranscript, setParsedTranscript] = useState<TranscriptSegment[]>([]);
@@ -27,6 +35,10 @@ const TranscriptAnalyzer = () => {
   const [topicRanges, setTopicRanges] = useState<TimeRange[]>([]);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
+  // State for copy feedback
+  const [promptCopied, setPromptCopied] = useState(false);
+  const [topicInfoCopied, setTopicInfoCopied] = useState(false);
+  const [transcriptViewCopied, setTranscriptViewCopied] = useState(false);
 
   const parseTimestamp = (timestamp: string) => {
     const parts = timestamp.split(':');
@@ -105,6 +117,9 @@ const TranscriptAnalyzer = () => {
       try {
         const json = JSON.parse(e.target?.result as string);
         setTopics(json);
+        // Reset selected topic and ranges when new JSON is loaded
+        setSelectedTopic(null);
+        setTopicRanges([]);
       } catch (error) {
         console.error("Failed to parse JSON:", error);
         alert("Invalid JSON file");
@@ -174,6 +189,128 @@ const TranscriptAnalyzer = () => {
     return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Helper function to group consecutive segments from the filtered list
+  const groupConsecutiveSegments = (
+    allSegments: TranscriptSegment[],
+    filteredSegments: TranscriptSegment[]
+  ): SegmentGroup[] => {
+    if (filteredSegments.length === 0) {
+      return [];
+    }
+
+    const groups: SegmentGroup[] = [];
+    if (allSegments.length === 0 || filteredSegments.length === 0) return groups;
+
+    let currentGroup: TranscriptSegment[] = [];
+    const segmentIndexMap = new Map(allSegments.map((seg, index) => [seg, index]));
+
+    for (let i = 0; i < filteredSegments.length; i++) {
+      const currentSegment = filteredSegments[i];
+      const currentSegmentIndex = segmentIndexMap.get(currentSegment);
+
+      if (currentGroup.length === 0) {
+        // Start a new group
+        currentGroup.push(currentSegment);
+      } else {
+        const prevSegmentInGroup = currentGroup[currentGroup.length - 1];
+        const prevSegmentIndex = segmentIndexMap.get(prevSegmentInGroup);
+
+        // Check if the current segment immediately follows the previous one in the *original* transcript
+        // and if its index exists
+        if (currentSegmentIndex !== undefined && prevSegmentIndex !== undefined && currentSegmentIndex === prevSegmentIndex + 1) {
+          currentGroup.push(currentSegment);
+        } else {
+          // End the current group and start a new one
+          if (currentGroup.length > 0) {
+             groups.push({
+              firstSegment: currentGroup[0],
+              lastSegment: currentGroup[currentGroup.length - 1],
+              segments: currentGroup,
+            });
+          }
+          currentGroup = [currentSegment];
+        }
+      }
+    }
+
+    // Push the last group
+    if (currentGroup.length > 0) {
+      groups.push({
+        firstSegment: currentGroup[0],
+        lastSegment: currentGroup[currentGroup.length - 1],
+        segments: currentGroup,
+      });
+    }
+
+    return groups;
+  };
+
+  // Memoize the filtered and grouped segments
+  const displayedContent = useMemo(() => {
+    const filteredSegments = parsedTranscript.filter(segment => !selectedTopic || isSegmentInRange(segment));
+    
+    if (selectedTopic) {
+      // If a topic is selected, group the filtered segments
+      return groupConsecutiveSegments(parsedTranscript, filteredSegments);
+    } else {
+      // If no topic is selected, return individual segments
+      return filteredSegments;
+    }
+  }, [parsedTranscript, selectedTopic, topicRanges]); // Dependencies for useMemo
+
+  // Generic copy handler with feedback
+  const handleCopy = (textToCopy: string, setCopiedState: (copied: boolean) => void) => {
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      setCopiedState(true);
+      setTimeout(() => setCopiedState(false), 2000); // Reset after 2 seconds
+    }, (err) => {
+      console.error('Failed to copy: ', err);
+      alert('Failed to copy text.');
+    });
+  };
+
+  // Specific copy handlers
+  const handleCopyPrompt = () => {
+    handleCopy(promptText, setPromptCopied);
+  };
+
+  const handleCopyTopicInfo = () => {
+    if (!selectedTopic) return;
+    const topicInfoString = `Topic: ${selectedTopic.name}
+
+Information:
+${selectedTopic.information}
+
+Key Quotes:
+${selectedTopic.key_quotes.map(q => `- ${q}`).join('\n')}
+
+Time Ranges:
+${selectedTopic.time_ranges.map(r => `- ${r.start} - ${r.end}`).join('\n')}
+`;
+    handleCopy(topicInfoString, setTopicInfoCopied);
+  };
+
+  const handleCopyTranscriptView = () => {
+    let transcriptString = "";
+    if (displayedContent.length === 0) return;
+
+    displayedContent.forEach(item => {
+      if ('segments' in item) {
+        // Grouped segment block
+        const group = item as SegmentGroup;
+        transcriptString += `${formatTime(group.firstSegment.startTime)}-${formatTime(group.lastSegment.endTime)}\n`;
+        transcriptString += group.segments.map(s => s.text).join('\n') + '\n\n';
+      } else {
+        // Individual segment
+        const segment = item as TranscriptSegment;
+        transcriptString += `${formatTime(segment.startTime)}-${formatTime(segment.endTime)}\n`;
+        transcriptString += segment.text + '\n\n';
+      }
+    });
+
+    handleCopy(transcriptString.trim(), setTranscriptViewCopied);
+  };
+
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Left Sidebar - Topics */}
@@ -193,6 +330,14 @@ const TranscriptAnalyzer = () => {
                 <input type="file" className="hidden" onChange={handleJsonUpload} accept=".json" />
               </label>
             </div>
+            {/* Add Copy Prompt Button */}     
+            <button 
+              className={`mt-3 w-full border rounded p-2 text-center text-sm ${promptCopied ? 'bg-gray-300' : 'bg-gray-100 hover:bg-gray-200'}`}
+              onClick={handleCopyPrompt}
+              disabled={promptCopied}
+            >
+              {promptCopied ? 'Prompt Copied!' : 'Copy Prompt Text'}
+            </button>
           </div>
         </div>
         
@@ -241,7 +386,17 @@ const TranscriptAnalyzer = () => {
       <div className="flex-1 p-4 overflow-hidden flex flex-col">
         {selectedTopic && (
           <div className="mb-4 bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-bold mb-2">{selectedTopic.name}</h2>
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-xl font-bold">{selectedTopic.name}</h2>
+              {/* Add Copy Topic Info Button */} 
+              <button 
+                className={`px-3 py-1 text-xs rounded ${topicInfoCopied ? 'bg-blue-200' : 'bg-blue-100 hover:bg-blue-300'}`}
+                onClick={handleCopyTopicInfo}
+                disabled={topicInfoCopied}
+              >
+                {topicInfoCopied ? 'Copied!' : 'Copy Info'}
+              </button>
+            </div>
             <p className="mb-2">{selectedTopic.information}</p>
             <div className="mt-4">
               <h3 className="font-bold">Key Quotes:</h3>
@@ -251,6 +406,19 @@ const TranscriptAnalyzer = () => {
                 ))}
               </ul>
             </div>
+          </div>
+        )}
+        
+        {/* Add Copy Transcript View Button */} 
+        {parsedTranscript.length > 0 && (
+          <div className="mb-2 text-right">
+            <button 
+              className={`px-3 py-1 text-xs rounded ${transcriptViewCopied ? 'bg-yellow-300' : 'bg-yellow-100 hover:bg-yellow-200'}`}
+              onClick={handleCopyTranscriptView}
+              disabled={transcriptViewCopied || displayedContent.length === 0}
+            >
+              {transcriptViewCopied ? 'Copied View!' : 'Copy Current View'}
+            </button>
           </div>
         )}
         
@@ -268,19 +436,40 @@ const TranscriptAnalyzer = () => {
                 </div>
               ) : null}
               
-              {parsedTranscript
-                .filter(segment => !selectedTopic || isSegmentInRange(segment))
-                .map((segment, index) => (
-                  <div 
-                    key={index} 
-                    className={`mb-3 p-2 rounded ${isSegmentInRange(segment) ? 'highlight bg-yellow-100' : ''}`}
-                  >
-                    <div className="font-mono text-xs text-gray-500 mb-1">
-                      {formatTime(segment.startTime)}-{formatTime(segment.endTime)}
+              {displayedContent.map((item, index) => {
+                if ('segments' in item) {
+                  // Render a grouped segment block
+                  const group = item as SegmentGroup;
+                  return (
+                    <div 
+                      key={`group-${index}`} 
+                      className="mb-3 p-2 rounded highlight bg-yellow-100" // Always highlighted when grouped
+                    >
+                      <div className="font-mono text-xs text-gray-500 mb-1">
+                        {formatTime(group.firstSegment.startTime)}-{formatTime(group.lastSegment.endTime)}
+                      </div>
+                      {/* Join text with newlines */}
+                      <div style={{ whiteSpace: 'pre-line' }}> 
+                        {group.segments.map(s => s.text).join('\n')}
+                      </div>
                     </div>
-                    <div>{segment.text}</div>
-                  </div>
-                ))}
+                  );
+                } else {
+                  // Render an individual segment (when no topic is selected)
+                  const segment = item as TranscriptSegment;
+                  return (
+                    <div 
+                      key={`segment-${index}`} 
+                      className="mb-3 p-2 rounded" // No highlight when showing all
+                    >
+                      <div className="font-mono text-xs text-gray-500 mb-1">
+                        {formatTime(segment.startTime)}-{formatTime(segment.endTime)}
+                      </div>
+                      <div>{segment.text}</div>
+                    </div>
+                  );
+                }
+              })}
             </div>
           ) : (
             <div className="text-center text-gray-500 mt-8">
