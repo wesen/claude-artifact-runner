@@ -51,6 +51,14 @@ type dynamicRoute struct {
 // Dynamically added routes (for production mode)
 var dynamicRoutes []dynamicRoute
 
+// RouteConfig represents a route configuration for the frontend
+type RouteConfig struct {
+	Path      string        `json:"path"`
+	Component string        `json:"component"`
+	Exact     bool          `json:"exact,omitempty"`
+	Children  []RouteConfig `json:"children,omitempty"`
+}
+
 func main() {
 	// Define command line flags
 	port := flag.Int("port", 3000, "Port to serve on")
@@ -90,7 +98,7 @@ func main() {
 				}
 			}
 		}
-		
+
 		// Check for Vite HMR server
 		log.Debug().Msg("Checking for Vite HMR server running at http://localhost:5173")
 		_, err = http.Get("http://localhost:5173")
@@ -116,7 +124,7 @@ func main() {
 		// Try to serve the requested path
 		path := r.URL.Path
 		log.Debug().Str("path", path).Str("method", r.Method).Msg("Received request")
-		
+
 		// Check if file exists (on disk in dev mode, or in embed FS in prod mode)
 		fileExists := false
 		if *devMode {
@@ -163,6 +171,13 @@ func main() {
 				}
 				handleListArtifacts(w, r, *devMode)
 				return
+			case "/api/routes":
+				if r.Method != http.MethodGet {
+					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+					return
+				}
+				handleRoutes(w, r, *devMode)
+				return
 			default:
 				// Check if requesting a specific artifact by ID
 				if strings.HasPrefix(path, "/api/artifacts/") && r.Method == http.MethodGet {
@@ -175,7 +190,7 @@ func main() {
 				return
 			}
 		}
-			
+
 		// Check for dynamically added routes in production mode
 		if !*devMode {
 			// First check if this is a direct path to a dynamically added artifact
@@ -216,13 +231,13 @@ func handleSaveArtifact(w http.ResponseWriter, r *http.Request, devMode bool) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-	
+
 	// Handle preflight OPTIONS request
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	
+
 	// Parse request body
 	var artifact Artifact
 	err := json.NewDecoder(r.Body).Decode(&artifact)
@@ -280,12 +295,12 @@ func handleSaveArtifact(w http.ResponseWriter, r *http.Request, devMode bool) {
 			http.Error(w, "Failed to save artifact", http.StatusInternalServerError)
 			return
 		}
-		
+
 		log.Info().Str("name", artifact.Name).Str("filePath", filePath).Msg("Artifact saved to file")
-		
+
 		// In development mode, we need to understand the Vite HMR and route generation process
 		log.Debug().Str("file", safeFileName+".tsx").Msg("Artifact file created, initiating dev-mode route process")
-		
+
 		// Check if Vite has a file watcher running (it should)
 		viteHmrCheck := func() {
 			// Try to ping the Vite server to check if it's running
@@ -295,7 +310,7 @@ func handleSaveArtifact(w http.ResponseWriter, r *http.Request, devMode bool) {
 			} else {
 				log.Debug().Msg("Vite server is running and should detect the new file")
 			}
-			
+
 			// Check if the vite-plugin-pages is configured correctly
 			viteConfigPath := "vite.config.ts"
 			if _, err := os.Stat(viteConfigPath); err == nil {
@@ -308,16 +323,16 @@ func handleSaveArtifact(w http.ResponseWriter, r *http.Request, devMode bool) {
 					}
 				}
 			}
-			
+
 			// Log information about how vite-plugin-pages works
 			log.Info().Msg("vite-plugin-pages generates routes at build time and during HMR")
 			log.Info().Msg("New routes should be available after Vite detects file changes")
 			log.Info().Msg("If routes aren't updating, try navigating to /home first")
 		}
-		
+
 		// Run the check in a goroutine to not block the response
 		go viteHmrCheck()
-		
+
 		// Useful explanation for debugging
 		log.Debug().Msg("For debugging: After saving a new artifact, the following happens:")
 		log.Debug().Msg("1. File is created in src/artifacts/")
@@ -336,27 +351,27 @@ func handleSaveArtifact(w http.ResponseWriter, r *http.Request, devMode bool) {
 
 		// Store in-memory
 		inMemoryArtifacts[safeFileName] = artifact
-		
+
 		// Add to dynamic routes
 		dynamicRoutes = append(dynamicRoutes, dynamicRoute{
 			path:     "/" + safeFileName,
 			artifact: artifact,
 		})
-		
+
 		log.Info().Str("name", artifact.Name).Str("path", "/"+safeFileName).Msg("Added dynamic route for artifact")
 	}
 
 	// Return success response with more detailed guidance
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	
+
 	var message string
 	if devMode {
 		message = "Artifact saved successfully. The route will be available after Vite processes the file change. You may need to visit the Home page first or refresh the browser."
 	} else {
 		message = "Artifact saved successfully"
 	}
-	
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "success",
 		"message": message,
@@ -371,21 +386,21 @@ func handleSaveArtifact(w http.ResponseWriter, r *http.Request, devMode bool) {
 func sanitizeFileName(name string) string {
 	// Replace spaces with hyphens
 	name = strings.ReplaceAll(name, " ", "-")
-	
+
 	// Keep only alphanumeric characters, hyphens, and underscores
 	reg := regexp.MustCompile(`[^a-zA-Z0-9-_]`)
 	name = reg.ReplaceAllString(name, "")
-	
+
 	// Ensure the name starts with a letter
 	if len(name) > 0 && !regexp.MustCompile(`^[a-zA-Z]`).MatchString(name) {
 		name = "artifact-" + name
 	}
-	
+
 	// If name is empty after sanitization, use a default name
 	if name == "" {
 		name = "artifact-" + fmt.Sprintf("%d", time.Now().Unix())
 	}
-	
+
 	return name
 }
 
@@ -394,9 +409,9 @@ func handleListArtifacts(w http.ResponseWriter, r *http.Request, devMode bool) {
 	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	var artifacts []ArtifactInfo
-	
+
 	// Static/built-in artifacts
 	builtIns := []ArtifactInfo{
 		{
@@ -416,9 +431,9 @@ func handleListArtifacts(w http.ResponseWriter, r *http.Request, devMode bool) {
 			BuiltIn:     true,
 		},
 	}
-	
+
 	artifacts = append(artifacts, builtIns...)
-	
+
 	// Add dynamic artifacts depending on mode
 	if devMode {
 		// Read from filesystem
@@ -428,25 +443,25 @@ func handleListArtifacts(w http.ResponseWriter, r *http.Request, devMode bool) {
 			for _, file := range fileInfos {
 				// Skip index.tsx, signup.tsx (built-ins), and non-tsx files
 				name := file.Name()
-				if name == "index.tsx" || name == "signup.tsx" || name == "home.tsx" || 
-				   name == "paste.tsx" || name == "404.tsx" || !strings.HasSuffix(name, ".tsx") {
+				if name == "index.tsx" || name == "signup.tsx" || name == "home.tsx" ||
+					name == "paste.tsx" || name == "404.tsx" || !strings.HasSuffix(name, ".tsx") {
 					continue
 				}
-				
+
 				// Get file info for timestamp
 				info, err := file.Info()
 				if err != nil {
 					log.Warn().Err(err).Str("file", name).Msg("Failed to get file info")
 					continue
 				}
-				
+
 				// Extract ID from filename
 				id := strings.TrimSuffix(name, ".tsx")
 				displayName := strings.ReplaceAll(id, "-", " ")
 				displayName = strings.Title(displayName)
-				
+
 				log.Debug().Str("id", id).Str("displayName", displayName).Msg("Found artifact from file")
-				
+
 				artifacts = append(artifacts, ArtifactInfo{
 					ID:          id,
 					Name:        displayName,
@@ -474,7 +489,7 @@ func handleListArtifacts(w http.ResponseWriter, r *http.Request, devMode bool) {
 			})
 		}
 	}
-	
+
 	// Return the list
 	log.Debug().Int("count", len(artifacts)).Msg("Returning artifact list")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -487,9 +502,9 @@ func handleGetArtifact(w http.ResponseWriter, r *http.Request, artifactID string
 	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	log.Debug().Str("artifactID", artifactID).Bool("devMode", devMode).Msg("Getting artifact")
-	
+
 	if devMode {
 		// In dev mode, check if file exists
 		filePath := filepath.Join("src", "artifacts", artifactID+".tsx")
@@ -498,7 +513,7 @@ func handleGetArtifact(w http.ResponseWriter, r *http.Request, artifactID string
 			http.Error(w, "Artifact not found", http.StatusNotFound)
 			return
 		}
-		
+
 		// Read file content
 		content, err := os.ReadFile(filePath)
 		if err != nil {
@@ -506,7 +521,7 @@ func handleGetArtifact(w http.ResponseWriter, r *http.Request, artifactID string
 			http.Error(w, "Failed to read artifact", http.StatusInternalServerError)
 			return
 		}
-		
+
 		// Return artifact info
 		log.Debug().Str("artifactID", artifactID).Msg("Returning artifact from file")
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -523,7 +538,7 @@ func handleGetArtifact(w http.ResponseWriter, r *http.Request, artifactID string
 			http.Error(w, "Artifact not found", http.StatusNotFound)
 			return
 		}
-		
+
 		// Return artifact info
 		log.Debug().Str("artifactID", artifactID).Msg("Returning artifact from memory")
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -571,9 +586,82 @@ const %sArtifact = () => {
 };
 
 export default %sArtifact;
-`, 
-		strings.Title(strings.ReplaceAll(name, "-", "")), 
+`,
+		strings.Title(strings.ReplaceAll(name, "-", "")),
 		displayName,
 		htmlCode,
 		strings.Title(strings.ReplaceAll(name, "-", "")))
+}
+
+// handleRoutes returns the available routes for the frontend
+func handleRoutes(w http.ResponseWriter, r *http.Request, devMode bool) {
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+
+	// Create routes array
+	var routes []RouteConfig
+
+	// Add built-in routes
+	routes = append(routes, RouteConfig{
+		Path:      "/",
+		Component: "index",
+		Exact:     true,
+	})
+
+	routes = append(routes, RouteConfig{
+		Path:      "/signup",
+		Component: "signup",
+		Exact:     true,
+	})
+
+	// Add dynamic routes from artifacts
+	if devMode {
+		// In dev mode, read from filesystem
+		fileInfos, err := os.ReadDir(filepath.Join("src", "artifacts"))
+		if err == nil {
+			for _, file := range fileInfos {
+				// Skip index.tsx, signup.tsx (built-ins), and non-tsx files
+				name := file.Name()
+				if name == "index.tsx" || name == "signup.tsx" || name == "home.tsx" ||
+					name == "paste.tsx" || name == "404.tsx" || !strings.HasSuffix(name, ".tsx") {
+					continue
+				}
+
+				// Extract ID from filename
+				id := strings.TrimSuffix(name, ".tsx")
+
+				// Add to routes
+				routes = append(routes, RouteConfig{
+					Path:      "/" + id,
+					Component: id,
+					Exact:     true,
+				})
+			}
+		} else {
+			log.Error().Err(err).Msg("Failed to read artifacts directory for routes")
+		}
+	} else {
+		// In production, use in-memory artifacts
+		for id := range inMemoryArtifacts {
+			routes = append(routes, RouteConfig{
+				Path:      "/" + id,
+				Component: id,
+				Exact:     true,
+			})
+		}
+	}
+
+	// Include home route
+	routes = append(routes, RouteConfig{
+		Path:      "/home",
+		Component: "home",
+		Exact:     true,
+	})
+
+	// Return JSON response - directly return the routes array
+	log.Debug().Int("routeCount", len(routes)).Msg("Returning routes")
+	// Set cache headers for better performance
+	w.Header().Set("Cache-Control", "max-age=10") // Cache for 10 seconds
+	json.NewEncoder(w).Encode(routes)
 }
